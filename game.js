@@ -29,6 +29,11 @@ class MusicGame {
         this.bpm = 120;
         this.beatInterval = 60000 / this.bpm;
         
+        // 音楽解析・譜面生成
+        this.audioContext = null;
+        this.beatDetector = null;
+        this.chartGenerator = new ChartGenerator(this.bpm);
+        
         this.particles = [];
         
         this.init();
@@ -240,9 +245,30 @@ class MusicGame {
         this.score = 0;
         this.combo = 0;
         this.notes = [];
+        
+        // 音楽解析の初期化
+        this.initAudioAnalysis();
+        
+        // 譜面生成
         this.generateRandomPattern();
         
         this.playBackgroundMusic();
+        
+        console.log(`Game started with ${this.notes.length} notes`);
+    }
+    
+    initAudioAnalysis() {
+        try {
+            // AudioContext初期化（ユーザー操作後なので可能）
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            if (this.audio && this.audioLoaded) {
+                this.beatDetector = new BeatDetector(this.audioContext, this.audio);
+                this.beatDetector.init();
+            }
+        } catch (error) {
+            console.log('Audio analysis initialization failed:', error);
+        }
     }
 
     playBackgroundMusic() {
@@ -256,29 +282,45 @@ class MusicGame {
 
     generateRandomPattern() {
         this.notes = [];
-        const patternDuration = 60000;
-        const noteInterval = 500;
         
-        for (let time = 2000; time < patternDuration; time += noteInterval + Math.random() * 300) {
-            const lane = Math.floor(Math.random() * 4);
-            this.notes.push({
-                lane: lane,
-                time: time,
-                y: -50,
-                hit: false
-            });
+        // 選択中の楽曲情報を取得
+        const selectedSongId = this.songManager.getSelectedSong();
+        const songInfo = this.songManager.getSongInfo(selectedSongId);
+        
+        if (songInfo) {
+            this.chartGenerator.setBPM(songInfo.bpm);
+            console.log(`Generating chart for ${songInfo.name} at ${songInfo.bpm} BPM`);
             
-            if (Math.random() < 0.3) {
-                time += 250;
-                const lane2 = (lane + 1 + Math.floor(Math.random() * 3)) % 4;
+            // 楽曲専用の譜面生成
+            const chartNotes = this.chartGenerator.generateSongSpecificChart(selectedSongId, songInfo.duration);
+            
+            // ゲーム用ノーツオブジェクトに変換
+            chartNotes.forEach(note => {
                 this.notes.push({
-                    lane: lane2,
-                    time: time,
+                    lane: note.lane,
+                    time: note.time,
                     y: -50,
-                    hit: false
+                    hit: false,
+                    type: note.type || 'normal'
                 });
-            }
+            });
+        } else {
+            // フォールバック: 基本パターン生成
+            console.log('Generating basic pattern');
+            const chartNotes = this.chartGenerator.generateBasicChart(60000); // 1分間
+            
+            chartNotes.forEach(note => {
+                this.notes.push({
+                    lane: note.lane,
+                    time: note.time,
+                    y: -50,
+                    hit: false,
+                    type: note.type || 'normal'
+                });
+            });
         }
+        
+        console.log(`Generated ${this.notes.length} notes`);
     }
 
     handleKeyDown(e) {
@@ -408,10 +450,32 @@ class MusicGame {
         const currentTime = Date.now() - this.gameStartTime;
         const deltaTime = 16;
         
+        // ノーツの位置を時間ベースで計算
+        const lookAheadTime = 3000; // 3秒先まで表示
+        
         for (let note of this.notes) {
-            if (!note.hit) {
-                note.y += this.noteSpeed * deltaTime / 1000;
+            if (!note.hit && !note.visible) {
+                // ノーツを表示する時間になったかチェック
+                if (currentTime >= note.time - lookAheadTime) {
+                    note.visible = true;
+                    note.y = -50; // 画面上部から開始
+                }
+            }
+            
+            if (note.visible && !note.hit) {
+                // ノーツがヒットゾーンに到達する時間を計算
+                const timeToHit = note.time - currentTime;
+                const distanceToHit = this.hitZoneY + 50; // 画面上部からヒットゾーンまでの距離
                 
+                // 時間に基づいてY座標を計算
+                if (timeToHit > 0) {
+                    note.y = distanceToHit - (distanceToHit * (lookAheadTime - timeToHit) / lookAheadTime);
+                } else {
+                    // 時間を過ぎた場合は通常の移動
+                    note.y += this.noteSpeed * deltaTime / 1000;
+                }
+                
+                // ミス判定
                 if (note.y > this.hitZoneY + this.hitTolerance && !note.hit) {
                     note.hit = true;
                     this.combo = 0;
@@ -420,6 +484,7 @@ class MusicGame {
             }
         }
         
+        // パーティクル更新
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const particle = this.particles[i];
             particle.x += particle.vx * deltaTime / 1000;
@@ -428,6 +493,17 @@ class MusicGame {
             
             if (particle.life <= 0) {
                 this.particles.splice(i, 1);
+            }
+        }
+        
+        // 音楽解析データを使ったリアルタイム調整
+        if (this.beatDetector) {
+            const volumeLevel = this.beatDetector.getVolumeLevel();
+            const frequencyBands = this.beatDetector.getFrequencyBands();
+            
+            // 音量に応じたエフェクト（背景の明度調整など）
+            if (volumeLevel > 0.7) {
+                this.drawBackground(true); // 高音量時のエフェクト
             }
         }
     }
@@ -485,12 +561,25 @@ class MusicGame {
 
     drawNotes() {
         for (let note of this.notes) {
-            if (note.hit) continue;
+            if (note.hit || !note.visible) continue;
             
             const x = this.lanes[note.lane];
+            
+            // ノーツの種類に応じて色を変更
+            let color1 = '#ff6b6b';
+            let color2 = '#ffd93d';
+            
+            if (note.type === 'beat') {
+                color1 = '#00ff00';
+                color2 = '#00aa00';
+            } else if (note.type === 'melody') {
+                color1 = '#0080ff';
+                color2 = '#0040aa';
+            }
+            
             const gradient = this.ctx.createRadialGradient(x, note.y, 0, x, note.y, 30);
-            gradient.addColorStop(0, '#ff6b6b');
-            gradient.addColorStop(1, '#ffd93d');
+            gradient.addColorStop(0, color1);
+            gradient.addColorStop(1, color2);
             
             this.ctx.fillStyle = gradient;
             this.ctx.beginPath();
@@ -500,6 +589,19 @@ class MusicGame {
             this.ctx.strokeStyle = '#ffffff';
             this.ctx.lineWidth = 2;
             this.ctx.stroke();
+            
+            // デバッグ用：ノーツのタイミング表示
+            if (this.isPlaying) {
+                const currentTime = Date.now() - this.gameStartTime;
+                const timeDiff = note.time - currentTime;
+                
+                if (Math.abs(timeDiff) < 200) { // ±200ms以内
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.font = '12px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(Math.round(timeDiff), x, note.y - 35);
+                }
+            }
         }
     }
 
