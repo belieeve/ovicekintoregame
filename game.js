@@ -45,6 +45,13 @@ class MusicGame {
 
     init() {
         this.startButton.addEventListener('click', () => this.startGame());
+        
+        // 音声テストボタンを追加
+        const testAudioButton = document.getElementById('testAudioButton');
+        if (testAudioButton) {
+            testAudioButton.addEventListener('click', () => this.testAudio());
+        }
+        
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
         document.addEventListener('keyup', (e) => this.handleKeyUp(e));
         
@@ -365,9 +372,14 @@ class MusicGame {
     }
 
     playBackgroundMusic() {
-        // 動画には音声がないので、常に音楽ファイルを使用
+        console.log('=== BACKGROUND MUSIC PLAYBACK ===');
+        
+        // まず簡単なビープ音をテスト
+        this.playSimpleBeep();
+        
+        // 音楽ファイルがあれば再生を試行
         if (this.audio && this.audioLoaded) {
-            console.log('Attempting to play background music...');
+            console.log('Attempting to play loaded background music...');
             this.audio.currentTime = 0;
             this.audio.volume = 0.8;
             this.audio.loop = true;
@@ -375,28 +387,69 @@ class MusicGame {
             const playPromise = this.audio.play();
             if (playPromise !== undefined) {
                 playPromise.then(() => {
-                    console.log('Background music started successfully');
+                    console.log('✅ Background music started successfully');
                 }).catch(e => {
-                    console.error('Background music playback failed:', e);
-                    
-                    // ユーザー操作が必要な場合の処理
-                    if (e.name === 'NotAllowedError') {
-                        console.log('Audio blocked by browser autoplay policy - showing unblock message');
-                        this.showAudioUnblockMessage();
-                    }
+                    console.error('❌ Background music playback failed:', e);
+                    this.showAudioUnblockMessage();
                 });
             }
         } else {
-            console.warn('Background music not loaded - checking state...');
-            console.log('Audio state:', {
-                hasAudio: !!this.audio,
-                audioLoaded: this.audioLoaded,
-                audioSrc: this.audio ? this.audio.src : 'N/A',
-                audioReadyState: this.audio ? this.audio.readyState : 'N/A'
-            });
+            console.warn('⚠️ Background music not loaded, using fallback audio...');
+            this.createFallbackAudio();
+        }
+    }
+    
+    playSimpleBeep() {
+        try {
+            console.log('Playing simple beep sound...');
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
             
-            // 音楽ファイルがない場合の代替手段
-            this.tryAlternateAudio();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+            
+            console.log('✅ Simple beep played');
+        } catch (error) {
+            console.error('❌ Simple beep failed:', error);
+        }
+    }
+    
+    createFallbackAudio() {
+        try {
+            console.log('Creating fallback audio...');
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // 単純なリピートビープ音を作成
+            const playBeep = () => {
+                if (this.isPlaying) {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.1);
+                    
+                    setTimeout(playBeep, 1000); // 1秒ごとにビープ
+                }
+            };
+            
+            playBeep();
+            console.log('✅ Fallback audio created (repeating beep)');
+            
+        } catch (error) {
+            console.error('❌ Fallback audio creation failed:', error);
         }
     }
     
@@ -468,6 +521,87 @@ class MusicGame {
                 message.parentElement.removeChild(message);
             }
         }, 5000);
+    }
+
+    // 音声テスト機能
+    testAudio() {
+        console.log('=== AUDIO TEST STARTED ===');
+        
+        // 最もシンプルなテスト: Web Audio API で直接音を生成
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A4音
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.5); // 0.5秒再生
+            
+            console.log('✅ Web Audio API test successful - you should hear a beep');
+            this.showAudioTestResult(true, 'Web Audio API test successful');
+            
+        } catch (error) {
+            console.error('❌ Web Audio API test failed:', error);
+            
+            // HTML5 Audio 要素でテスト
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBzuR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmMeC0OQ1u+9diMElgP3v4z5///m//8P////B///wP///4//D/+H////P//7/wD/+//////w//////////+AAAAAAP//////////+AAAAAAAAAAAAP//8A//8A8A/wAAAAA=');
+                
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('✅ HTML5 Audio test successful');
+                        this.showAudioTestResult(true, 'HTML5 Audio test successful');
+                    }).catch(e => {
+                        console.error('❌ HTML5 Audio test failed:', e);
+                        this.showAudioTestResult(false, 'Both audio tests failed: ' + e.message);
+                    });
+                }
+                
+            } catch (htmlError) {
+                console.error('❌ HTML5 Audio test failed:', htmlError);
+                this.showAudioTestResult(false, 'All audio tests failed');
+            }
+        }
+    }
+    
+    showAudioTestResult(success, message) {
+        const resultDiv = document.createElement('div');
+        resultDiv.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: ${success ? '#4CAF50' : '#f44336'};
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 2000;
+            text-align: center;
+            font-family: Arial, sans-serif;
+            max-width: 400px;
+        `;
+        resultDiv.innerHTML = `
+            <h3>${success ? '✅ 音声テスト成功' : '❌ 音声テスト失敗'}</h3>
+            <p>${message}</p>
+            <button onclick="this.parentElement.remove()" style="
+                background: white;
+                color: ${success ? '#4CAF50' : '#f44336'};
+                border: none;
+                padding: 8px 16px;
+                border-radius: 5px;
+                cursor: pointer;
+                margin-top: 10px;
+            ">閉じる</button>
+        `;
+        document.body.appendChild(resultDiv);
+        
+        console.log('=== AUDIO TEST COMPLETED ===');
     }
     
     showAudioUnblockMessage() {
