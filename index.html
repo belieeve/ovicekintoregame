@@ -318,6 +318,8 @@
         </div>
     </div>
 
+    <div id="debug-log" style="position: fixed; bottom: 0; left: 0; width: 100%; height: 120px; background: rgba(0,0,0,0.7); color: #0f0; font-family: monospace; font-size: 12px; overflow-y: scroll; z-index: 10000; padding: 5px; box-sizing: border-box;"></div>
+
     <script src="sampleMusic.js?v=2024091401"></script>
     <script src="musicData.js?v=2024091401"></script>
     <script src="musicLoader.js?v=2024091401"></script>
@@ -326,3 +328,74 @@
     <script src="game.js?v=2024091401"></script>
 </body>
 </html>
+
+<script>
+// ChartGeneratorクラスの定義
+class ChartGenerator {
+    constructor(bpm) {
+        this.bpm = bpm;
+        this.beatInterval = 60000 / this.bpm;
+    }
+
+    setBPM(bpm) {
+        this.bpm = bpm;
+        this.beatInterval = 60000 / this.bpm;
+    }
+
+    // 楽曲ごとの譜面を生成
+    generateSongSpecificChart(songId, duration) {
+        const notes = [];
+        const totalBeats = Math.floor(duration * 1000 / this.beatInterval);
+
+        if (songId === 'ovicesong01') {
+            // 筋トレチャットのテーマソング譜面
+            for (let i = 0; i < totalBeats; i++) {
+                const time = i * this.beatInterval;
+                if (i % 8 < 4) { // 交互に
+                    notes.push({ lane: i % 2, time: time, type: 'beat' });
+                }
+                if (i % 16 === 0) { // シンバル
+                    notes.push({ lane: 3, time: time, type: 'melody' });
+                }
+            }
+        } else if (songId === 'ovicesong02') {
+            // oviceで会えた奇跡の譜面
+            for (let i = 0; i < totalBeats; i++) {
+                const time = i * this.beatInterval;
+                if (i % 4 === 0) {
+                    notes.push({ lane: 0, time: time, type: 'beat' });
+                }
+                if (i % 4 === 2) {
+                    notes.push({ lane: 1, time: time, type: 'beat' });
+                }
+                if (i % 8 === 0) {
+                    notes.push({ lane: 2, time: time, type: 'melody' });
+                    notes.push({ lane: 3, time: time, type: 'melody' });
+                }
+            }
+        } else {
+            // デフォルト譜面
+            return this.generateBasicChart(duration);
+        }
+        return notes;
+    }
+
+    // 基本的な譜面を生成
+    generateBasicChart(duration) {
+        const notes = [];
+        const totalBeats = Math.floor(duration / this.beatInterval);
+
+        for (let i = 0; i < totalBeats; i++) {
+            const time = i * this.beatInterval;
+            if (Math.random() < 0.6) {
+                notes.push({
+                    lane: Math.floor(Math.random() * 4),
+                    time: time,
+                    type: 'normal'
+                });
+            }
+        }
+        return notes;
+    }
+}
+</script>
