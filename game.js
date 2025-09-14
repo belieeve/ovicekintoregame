@@ -50,8 +50,14 @@ class MusicGame {
     initSongSelection() {
         const songItems = document.querySelectorAll('.song-item');
         
-        songItems.forEach(item => {
-            item.addEventListener('click', () => {
+        songItems.forEach((item, index) => {
+            // クリックイベント
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log(`Song item clicked: ${index}`);
+                
                 // 他の曲の選択を解除
                 songItems.forEach(other => other.classList.remove('active'));
                 
@@ -67,7 +73,26 @@ class MusicGame {
                 
                 console.log(`Song selected: ${songId}`);
             });
+            
+            // タッチイベント（モバイル対応）
+            item.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                item.click();
+            });
+            
+            // ホバーエフェクトのバックアップ
+            item.addEventListener('mouseenter', () => {
+                item.style.background = 'rgba(255, 255, 255, 0.2)';
+            });
+            
+            item.addEventListener('mouseleave', () => {
+                if (!item.classList.contains('active')) {
+                    item.style.background = 'rgba(255, 255, 255, 0.1)';
+                }
+            });
         });
+        
+        console.log(`Initialized ${songItems.length} song selection items`);
     }
     
     updateSelectedSongInfo(songId) {
