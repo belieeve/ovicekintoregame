@@ -13,13 +13,13 @@ class MusicGame {
         this.gameStartTime = 0;
         
         this.notes = [];
-        this.lanes = [200, 300, 500, 600];
+        this.lanes = [300, 450, 600, 750];
         this.keys = ['d', 'f', 'j', 'k'];
         this.laneKeys = { 'd': 0, 'f': 1, 'j': 2, 'k': 3 };
         this.keyPressed = [false, false, false, false];
         
-        this.noteSpeed = 300;
-        this.hitZoneY = 500;
+        this.noteSpeed = 400;
+        this.hitZoneY = 650;
         this.hitTolerance = 50;
         
         this.audio = null;
