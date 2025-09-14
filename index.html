@@ -192,6 +192,69 @@
             transition: width 0.3s ease;
             border-radius: 5px;
         }
+
+        #songSelection {
+            margin: 20px 0;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .song-selection-title {
+            color: white;
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        #songList {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .song-item {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .song-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .song-item.active {
+            background: linear-gradient(45deg, #ff6b6b, #ffd93d);
+            border-color: #ffffff;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .song-info {
+            flex: 1;
+        }
+
+        .song-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .song-artist {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .song-item.active .song-artist {
+            opacity: 0.7;
+        }
     </style>
 </head>
 <body>
@@ -225,6 +288,25 @@
                 D・F・J・Kキーを使って演奏しよう<br>
                 タイミングよく押してハイスコアを目指そう！
             </div>
+            
+            <div id="songSelection">
+                <h3 class="song-selection-title">楽曲を選択してください</h3>
+                <div id="songList">
+                    <div class="song-item active" data-song="ovicesong01">
+                        <div class="song-info">
+                            <div class="song-name">筋トレチャット テーマソング</div>
+                            <div class="song-artist">「画面の向こう、汗をかこう！」</div>
+                        </div>
+                    </div>
+                    <div class="song-item" data-song="ovicesong02">
+                        <div class="song-info">
+                            <div class="song-name">oviceで会えた奇跡</div>
+                            <div class="song-artist">オリジナル楽曲</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <button id="startButton">ゲーム開始</button>
         </div>
     </div>
@@ -232,6 +314,7 @@
     <script src="sampleMusic.js?v=2024091401"></script>
     <script src="musicData.js?v=2024091401"></script>
     <script src="musicLoader.js?v=2024091401"></script>
+    <script src="songManager.js?v=2024091401"></script>
     <script src="game.js?v=2024091401"></script>
 </body>
 </html>

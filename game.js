@@ -25,6 +25,7 @@ class MusicGame {
         this.audio = null;
         this.audioLoaded = false;
         this.musicDataManager = new MusicDataManager();
+        this.songManager = new SongManager();
         this.bpm = 120;
         this.beatInterval = 60000 / this.bpm;
         
@@ -38,9 +39,46 @@ class MusicGame {
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
         document.addEventListener('keyup', (e) => this.handleKeyUp(e));
         
+        // 楽曲選択UIの初期化
+        this.initSongSelection();
+        
         this.generateRandomPattern();
         this.preloadAudio();
         this.gameLoop();
+    }
+    
+    initSongSelection() {
+        const songItems = document.querySelectorAll('.song-item');
+        
+        songItems.forEach(item => {
+            item.addEventListener('click', () => {
+                // 他の曲の選択を解除
+                songItems.forEach(other => other.classList.remove('active'));
+                
+                // 選択した曲をアクティブにする
+                item.classList.add('active');
+                
+                // SongManagerで楽曲を選択
+                const songId = item.getAttribute('data-song');
+                this.songManager.selectSong(songId);
+                
+                // 選択した楽曲の情報を更新
+                this.updateSelectedSongInfo(songId);
+                
+                console.log(`Song selected: ${songId}`);
+            });
+        });
+    }
+    
+    updateSelectedSongInfo(songId) {
+        const songInfo = this.songManager.getSongInfo(songId);
+        if (songInfo) {
+            // BPMを更新
+            this.bpm = songInfo.bpm;
+            this.beatInterval = 60000 / this.bpm;
+            
+            console.log(`Updated BPM to ${this.bpm} for song: ${songInfo.name}`);
+        }
     }
 
     preloadAudio() {
@@ -83,20 +121,8 @@ class MusicGame {
     }
     
     tryLoadExternalAudio(updateProgress) {
-        // キャッシュバスター追加
-        const cacheBuster = '?v=' + Date.now();
-        
-        const audioFiles = [
-            // GitHub raw URL（実際のリポジトリURL）- 最優先
-            'https://raw.githubusercontent.com/belieeve/ovicekintoregame/main/assets/audio/ovicesong01.mp3' + cacheBuster,
-            'https://raw.githubusercontent.com/belieeve/ovicekintoregame/main/assets/audio/ovicesong02.mp3' + cacheBuster,
-            // GitHub Pages URL
-            'https://belieeve.github.io/ovicekintoregame/assets/audio/ovicesong01.mp3' + cacheBuster,
-            'https://belieeve.github.io/ovicekintoregame/assets/audio/ovicesong02.mp3' + cacheBuster,
-            // ローカル・相対パス（フォールバック）
-            'assets/audio/ovicesong01.mp3' + cacheBuster,
-            'assets/audio/ovicesong02.mp3' + cacheBuster
-        ];
+        // 選択された楽曲のURLリストを取得
+        const audioFiles = this.songManager.getSelectedSongUrls();
         
         let loadedCount = 0;
         let totalFiles = audioFiles.length;
@@ -126,6 +152,11 @@ class MusicGame {
                     this.audioLoaded = true;
                     this.audio.volume = 0.7;
                     this.audio.loop = true;
+                    
+                    // 選択した楽曲をキャッシュ
+                    const selectedSongId = this.songManager.getSelectedSong();
+                    this.songManager.cacheAudioFile(selectedSongId, audio);
+                    
                     updateProgress(100);
                     this.showLoadingComplete(true);
                 }
@@ -164,9 +195,11 @@ class MusicGame {
                 if (audioType === 'サンプル音楽') {
                     instructions.innerHTML += `<br><small style="color: #FFA500;">♪ ${audioType}で開始します（GitHub音楽ファイル読み込み失敗）</small>`;
                 } else {
-                    const trackInfo = this.musicDataManager.getTrackInfo();
-                    if (trackInfo && trackInfo.name) {
-                        instructions.innerHTML += `<br><small style="color: #4CAF50;">♪ ${trackInfo.name} が読み込まれました</small>`;
+                    // 選択中の楽曲情報を表示
+                    const selectedSongId = this.songManager.getSelectedSong();
+                    const songInfo = this.songManager.getSongInfo(selectedSongId);
+                    if (songInfo) {
+                        instructions.innerHTML += `<br><small style="color: #4CAF50;">♪ ${songInfo.name} が読み込まれました</small>`;
                     } else {
                         instructions.innerHTML += `<br><small style="color: #4CAF50;">♪ 音楽ファイルが読み込まれました</small>`;
                     }
