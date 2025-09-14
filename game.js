@@ -208,22 +208,22 @@ class MusicGame {
         // 選択された楽曲のURLリストを取得
         const audioFiles = this.songManager.getSelectedSongUrls();
         
+        console.log('Trying to load audio from URLs:', audioFiles);
+        
         let loadedCount = 0;
         let totalFiles = audioFiles.length;
         
         const tryLoadAudio = (fileIndex) => {
             if (fileIndex >= audioFiles.length) {
-                // すべての外部音楽ファイルに失敗した場合、サンプル音楽を使用
-                console.log('All external audio files failed, using sample music');
-                try {
-                    this.audio = getSampleMusic();
-                    this.audioLoaded = true;
-                    updateProgress(100);
-                    this.showLoadingComplete(true, 'サンプル音楽');
-                } catch (error) {
-                    console.error('Sample music failed:', error);
-                    this.showLoadingComplete(false);
-                }
+                // すべての外部音楽ファイルに失敗した場合
+                console.log('All external audio files failed, preparing fallback...');
+                
+                // フォールバック音声を準備（実際の音楽ファイルがないことを示す）
+                this.audio = null;
+                this.audioLoaded = false;
+                
+                updateProgress(100);
+                this.showLoadingComplete(false, 'フォールバック音声');
                 return;
             }
             
@@ -273,14 +273,14 @@ class MusicGame {
             this.loadingScreen.style.display = 'none';
             this.startScreen.style.display = 'flex';
             
-            if (!audioFound) {
+            if (!audioFound || audioType === 'フォールバック音声') {
                 const instructions = this.startScreen.querySelector('.instructions');
                 instructions.innerHTML = `
                     音楽に合わせてノーツをタップしよう！<br>
                     D・F・J・Kキーを使って演奏しよう<br>
                     タイミングよく押してハイスコアを目指そう！<br>
-                    <small style="color: #ffaa00;">⚠️ 音楽ファイルが読み込めませんでした</small><br>
-                    <small style="color: #aaaaaa;">ブラウザのコンソールで詳細を確認できます</small>
+                    <small style="color: #4CAF50;">🔊 ビープ音でプレイできます</small><br>
+                    <small style="color: #aaaaaa;">音楽ファイルの代わりにシンプルなビープ音を使用</small>
                 `;
             } else {
                 const instructions = this.startScreen.querySelector('.instructions');
@@ -373,9 +373,12 @@ class MusicGame {
 
     playBackgroundMusic() {
         console.log('=== BACKGROUND MUSIC PLAYBACK ===');
-        
-        // まず簡単なビープ音をテスト
-        this.playSimpleBeep();
+        console.log('Audio state check:', {
+            hasAudio: !!this.audio,
+            audioLoaded: this.audioLoaded,
+            audioSrc: this.audio ? this.audio.src : 'N/A',
+            readyState: this.audio ? this.audio.readyState : 'N/A'
+        });
         
         // 音楽ファイルがあれば再生を試行
         if (this.audio && this.audioLoaded) {
@@ -390,11 +393,14 @@ class MusicGame {
                     console.log('✅ Background music started successfully');
                 }).catch(e => {
                     console.error('❌ Background music playback failed:', e);
-                    this.showAudioUnblockMessage();
+                    console.log('Falling back to beep audio...');
+                    this.playSimpleBeep();
+                    this.createFallbackAudio();
                 });
             }
         } else {
-            console.warn('⚠️ Background music not loaded, using fallback audio...');
+            console.warn('⚠️ Background music not loaded, using beep audio immediately...');
+            this.playSimpleBeep();
             this.createFallbackAudio();
         }
     }
@@ -426,7 +432,8 @@ class MusicGame {
             console.log('Creating fallback audio...');
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             
-            // 単純なリピートビープ音を作成
+            // より音楽的なビープパターンを作成
+            let beatCount = 0;
             const playBeep = () => {
                 if (this.isPlaying) {
                     const oscillator = audioContext.createOscillator();
@@ -435,18 +442,27 @@ class MusicGame {
                     oscillator.connect(gainNode);
                     gainNode.connect(audioContext.destination);
                     
-                    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-                    gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+                    // ビート数に応じて音程を変化させる（簡単なメロディパターン）
+                    const frequencies = [440, 523, 587, 659]; // A4, C5, D5, E5
+                    const freq = frequencies[beatCount % 4];
+                    
+                    oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                    
+                    // フェードアウト効果
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
                     
                     oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.1);
+                    oscillator.stop(audioContext.currentTime + 0.3);
                     
-                    setTimeout(playBeep, 1000); // 1秒ごとにビープ
+                    beatCount++;
+                    setTimeout(playBeep, 500); // 0.5秒ごとにビープ（120 BPM相当）
                 }
             };
             
-            playBeep();
-            console.log('✅ Fallback audio created (repeating beep)');
+            // 最初のビープを少し遅らせて、ゲーム開始を明確にする
+            setTimeout(playBeep, 500);
+            console.log('✅ Fallback audio created (melodic beep pattern)');
             
         } catch (error) {
             console.error('❌ Fallback audio creation failed:', error);
