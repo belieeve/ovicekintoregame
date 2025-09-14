@@ -118,9 +118,10 @@ class MusicGame {
     
     preloadBackgroundVideo() {
         this.backgroundVideo = document.createElement('video');
-        this.backgroundVideo.muted = true; // 音声はゲーム音楽を使用
+        this.backgroundVideo.muted = false; // 音声を有効にする
         this.backgroundVideo.loop = true;
         this.backgroundVideo.preload = 'auto';
+        this.backgroundVideo.volume = 0.7; // 音量設定
         this.backgroundVideo.style.display = 'none';
         
         // 動画ファイルのソースを設定
@@ -316,9 +317,18 @@ class MusicGame {
     playBackgroundVideo() {
         if (this.backgroundVideo && this.videoLoaded) {
             this.backgroundVideo.currentTime = 0;
-            this.backgroundVideo.play().catch(e => {
-                console.log('Video playback failed:', e);
-            });
+            this.backgroundVideo.volume = 0.7;
+            const playPromise = this.backgroundVideo.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log('Video with audio started successfully');
+                }).catch(e => {
+                    console.log('Video playback failed:', e);
+                    if (e.name === 'NotAllowedError') {
+                        console.log('Video blocked by browser autoplay policy');
+                    }
+                });
+            }
         }
     }
     
@@ -337,6 +347,13 @@ class MusicGame {
     }
 
     playBackgroundMusic() {
+        // 動画に音声が含まれている場合は、動画の音声を使用
+        if (this.backgroundVideo && this.videoLoaded) {
+            console.log('Using video audio as background music');
+            return;
+        }
+        
+        // 動画がない場合は従来のオーディオを使用
         if (this.audio && this.audioLoaded) {
             console.log('Attempting to play audio...');
             this.audio.currentTime = 0;
