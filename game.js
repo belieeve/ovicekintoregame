@@ -83,16 +83,19 @@ class MusicGame {
     }
     
     tryLoadExternalAudio(updateProgress) {
+        // キャッシュバスター追加
+        const cacheBuster = '?v=' + Date.now();
+        
         const audioFiles = [
             // GitHub raw URL（実際のリポジトリURL）- 最優先
-            'https://raw.githubusercontent.com/belieeve/ovicekintoregame/main/assets/audio/ovicesong01.mp3',
-            'https://raw.githubusercontent.com/belieeve/ovicekintoregame/main/assets/audio/ovicesong02.mp3',
+            'https://raw.githubusercontent.com/belieeve/ovicekintoregame/main/assets/audio/ovicesong01.mp3' + cacheBuster,
+            'https://raw.githubusercontent.com/belieeve/ovicekintoregame/main/assets/audio/ovicesong02.mp3' + cacheBuster,
             // GitHub Pages URL
-            'https://belieeve.github.io/ovicekintoregame/assets/audio/ovicesong01.mp3',
-            'https://belieeve.github.io/ovicekintoregame/assets/audio/ovicesong02.mp3',
+            'https://belieeve.github.io/ovicekintoregame/assets/audio/ovicesong01.mp3' + cacheBuster,
+            'https://belieeve.github.io/ovicekintoregame/assets/audio/ovicesong02.mp3' + cacheBuster,
             // ローカル・相対パス（フォールバック）
-            'assets/audio/ovicesong01.mp3',
-            'assets/audio/ovicesong02.mp3'
+            'assets/audio/ovicesong01.mp3' + cacheBuster,
+            'assets/audio/ovicesong02.mp3' + cacheBuster
         ];
         
         let loadedCount = 0;
