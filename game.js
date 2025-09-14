@@ -84,12 +84,13 @@ class MusicGame {
     
     tryLoadExternalAudio(updateProgress) {
         const audioFiles = [
+            // GitHub raw URL（実際のリポジトリURL）
+            'https://raw.githubusercontent.com/belieeve/ovicekintoregame/main/assets/audio/hentaisong.mp3',
+            'https://raw.githubusercontent.com/belieeve/ovicekintoregame/main/assets/audio/hentaisong02.mp3',
+            // ローカル・相対パス
             'assets/audio/hentaisong.mp3',
             'assets/audio/hentaisong02.mp3', 
-            'hentaisong.mp3',
-            // GitHub raw URL対応（リポジトリをフォークして音楽ファイルを追加した場合）
-            'https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/assets/audio/hentaisong.mp3',
-            'https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/assets/audio/hentaisong02.mp3'
+            'hentaisong.mp3'
         ];
         
         let loadedCount = 0;
