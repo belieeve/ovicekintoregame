@@ -118,10 +118,9 @@ class MusicGame {
     
     preloadBackgroundVideo() {
         this.backgroundVideo = document.createElement('video');
-        this.backgroundVideo.muted = false; // 音声を有効にする
+        this.backgroundVideo.muted = true; // 動画に音声がないためミュート
         this.backgroundVideo.loop = true;
         this.backgroundVideo.preload = 'auto';
-        this.backgroundVideo.volume = 0.7; // 音量設定
         this.backgroundVideo.style.display = 'none';
         
         // 動画ファイルのソースを設定
@@ -273,8 +272,8 @@ class MusicGame {
                     音楽に合わせてノーツをタップしよう！<br>
                     D・F・J・Kキーを使って演奏しよう<br>
                     タイミングよく押してハイスコアを目指そう！<br>
-                    <small style="color: #ffaa00;">※ 音楽ファイルが設定されていません</small><br>
-                    <small style="color: #aaaaaa;">コンソールで showMusicLoader() を実行して音楽を追加できます</small>
+                    <small style="color: #ffaa00;">⚠️ 音楽ファイルが読み込めませんでした</small><br>
+                    <small style="color: #aaaaaa;">ブラウザのコンソールで詳細を確認できます</small>
                 `;
             } else {
                 const instructions = this.startScreen.querySelector('.instructions');
@@ -291,6 +290,21 @@ class MusicGame {
                     }
                 }
             }
+            
+            // デバッグ情報をコンソールに出力
+            console.log('=== AUDIO DEBUG INFO ===');
+            console.log('Audio found:', audioFound);
+            console.log('Audio type:', audioType);
+            console.log('Has audio object:', !!this.audio);
+            console.log('Audio loaded:', this.audioLoaded);
+            if (this.audio) {
+                console.log('Audio src:', this.audio.src);
+                console.log('Audio ready state:', this.audio.readyState);
+                console.log('Audio duration:', this.audio.duration);
+            }
+            console.log('Selected song:', this.songManager.getSelectedSong());
+            console.log('Song URLs:', this.songManager.getSelectedSongUrls());
+            console.log('========================');
         }, 500);
     }
 
@@ -308,7 +322,12 @@ class MusicGame {
         // 譜面生成
         this.generateRandomPattern();
         
+        // 音楽を優先的に再生（audioファイル）
+        console.log('=== STARTING GAME ===');
+        console.log('Priority: Background music (audio) first, then background video');
         this.playBackgroundMusic();
+        
+        // 背景動画は音なしで再生
         this.playBackgroundVideo();
         
         console.log(`Game started with ${this.notes.length} notes`);
@@ -317,11 +336,10 @@ class MusicGame {
     playBackgroundVideo() {
         if (this.backgroundVideo && this.videoLoaded) {
             this.backgroundVideo.currentTime = 0;
-            this.backgroundVideo.volume = 0.7;
             const playPromise = this.backgroundVideo.play();
             if (playPromise !== undefined) {
                 playPromise.then(() => {
-                    console.log('Video with audio started successfully');
+                    console.log('Video started successfully (muted)');
                 }).catch(e => {
                     console.log('Video playback failed:', e);
                     if (e.name === 'NotAllowedError') {
@@ -347,40 +365,109 @@ class MusicGame {
     }
 
     playBackgroundMusic() {
-        // 動画に音声が含まれている場合は、動画の音声を使用
-        if (this.backgroundVideo && this.videoLoaded) {
-            console.log('Using video audio as background music');
-            return;
-        }
-        
-        // 動画がない場合は従来のオーディオを使用
+        // 動画には音声がないので、常に音楽ファイルを使用
         if (this.audio && this.audioLoaded) {
-            console.log('Attempting to play audio...');
+            console.log('Attempting to play background music...');
             this.audio.currentTime = 0;
-            this.audio.volume = 0.7;
+            this.audio.volume = 0.8;
+            this.audio.loop = true;
             
             const playPromise = this.audio.play();
             if (playPromise !== undefined) {
                 playPromise.then(() => {
-                    console.log('Audio playback started successfully');
+                    console.log('Background music started successfully');
                 }).catch(e => {
-                    console.error('Audio playback failed:', e);
+                    console.error('Background music playback failed:', e);
                     
                     // ユーザー操作が必要な場合の処理
                     if (e.name === 'NotAllowedError') {
-                        console.log('Audio blocked by browser autoplay policy');
+                        console.log('Audio blocked by browser autoplay policy - showing unblock message');
                         this.showAudioUnblockMessage();
                     }
                 });
             }
         } else {
-            console.warn('Audio not loaded or not available');
+            console.warn('Background music not loaded - checking state...');
             console.log('Audio state:', {
                 hasAudio: !!this.audio,
                 audioLoaded: this.audioLoaded,
-                audioSrc: this.audio ? this.audio.src : 'N/A'
+                audioSrc: this.audio ? this.audio.src : 'N/A',
+                audioReadyState: this.audio ? this.audio.readyState : 'N/A'
             });
+            
+            // 音楽ファイルがない場合の代替手段
+            this.tryAlternateAudio();
         }
+    }
+    
+    tryAlternateAudio() {
+        console.log('Trying alternate audio loading...');
+        try {
+            // サンプル音楽を試す
+            this.audio = getSampleMusic();
+            if (this.audio) {
+                this.audioLoaded = true;
+                console.log('Sample music loaded as fallback');
+                
+                // サンプル音楽が確実に再生されるようにイベントリスナーを追加
+                this.audio.addEventListener('canplaythrough', () => {
+                    console.log('Sample music is ready, attempting playback...');
+                    this.playBackgroundMusic();
+                });
+                
+                // 既に準備できている場合は即座に再生
+                if (this.audio.readyState >= 3) {
+                    this.playBackgroundMusic();
+                }
+            } else {
+                throw new Error('Sample music creation failed');
+            }
+        } catch (error) {
+            console.error('Alternate audio loading failed:', error);
+            
+            // 最後の手段として合成音楽を試す
+            try {
+                console.log('Trying synthetic music as last resort...');
+                this.synthesizedMusic = getExtendedSampleMusic();
+                if (this.synthesizedMusic) {
+                    console.log('Synthetic music created successfully');
+                    this.synthesizedMusic.start();
+                } else {
+                    this.showNoAudioMessage();
+                }
+            } catch (synthError) {
+                console.error('Synthetic music failed:', synthError);
+                this.showNoAudioMessage();
+            }
+        }
+    }
+    
+    showNoAudioMessage() {
+        const message = document.createElement('div');
+        message.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 165, 0, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 1000;
+            font-family: Arial, sans-serif;
+            max-width: 300px;
+        `;
+        message.innerHTML = `
+            <strong>🔇 音楽なし</strong><br>
+            音楽ファイルが読み込めませんでした。<br>
+            <small>ゲームは無音で実行されます。</small>
+        `;
+        document.body.appendChild(message);
+        
+        setTimeout(() => {
+            if (message.parentElement) {
+                message.parentElement.removeChild(message);
+            }
+        }, 5000);
     }
     
     showAudioUnblockMessage() {

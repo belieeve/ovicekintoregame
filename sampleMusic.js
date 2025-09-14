@@ -19,10 +19,63 @@ function encodeFileToBase64(file) {
 
 // サンプル音楽を取得する関数
 function getSampleMusic() {
+    console.log('Creating sample music (beep sound)...');
     const audio = new Audio(SAMPLE_MUSIC_DATA.beepSound);
-    audio.volume = 0.3;
+    audio.volume = 0.5;
     audio.loop = true;
+    
+    // 音楽が再生可能かテスト
+    audio.addEventListener('canplaythrough', () => {
+        console.log('Sample music ready to play');
+    });
+    
+    audio.addEventListener('error', (e) => {
+        console.error('Sample music error:', e);
+    });
+    
     return audio;
+}
+
+// より長いサンプル音楽（ビープ音のパターン）
+function getExtendedSampleMusic() {
+    console.log('Creating extended sample music...');
+    
+    // AudioContextを使用して合成音楽を作成
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const sampleRate = audioContext.sampleRate;
+        const duration = 30; // 30秒
+        const arrayBuffer = audioContext.createBuffer(1, sampleRate * duration, sampleRate);
+        const channelData = arrayBuffer.getChannelData(0);
+        
+        // 簡単なメロディパターンを生成
+        for (let i = 0; i < channelData.length; i++) {
+            const t = i / sampleRate;
+            const freq = 440 + Math.sin(t * 0.5) * 100; // 基本周波数 + 変調
+            channelData[i] = Math.sin(2 * Math.PI * freq * t) * 0.3 * Math.sin(t * 5); // 音量変調
+        }
+        
+        const source = audioContext.createBufferSource();
+        source.buffer = arrayBuffer;
+        source.loop = true;
+        
+        return {
+            audioContext: audioContext,
+            source: source,
+            start: function() {
+                source.connect(audioContext.destination);
+                source.start(0);
+                console.log('Extended sample music started');
+            },
+            stop: function() {
+                source.stop();
+                console.log('Extended sample music stopped');
+            }
+        };
+    } catch (error) {
+        console.error('Failed to create extended sample music:', error);
+        return null;
+    }
 }
 
 // 音楽ファイルをBase64で設定する関数
