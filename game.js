@@ -34,6 +34,10 @@ class MusicGame {
         this.beatDetector = null;
         this.chartGenerator = new ChartGenerator(this.bpm);
         
+        // 背景動画
+        this.backgroundVideo = null;
+        this.videoLoaded = false;
+        
         this.particles = [];
         
         this.init();
@@ -49,6 +53,7 @@ class MusicGame {
         
         this.generateRandomPattern();
         this.preloadAudio();
+        this.preloadBackgroundVideo();
         this.gameLoop();
     }
     
@@ -109,6 +114,48 @@ class MusicGame {
             
             console.log(`Updated BPM to ${this.bpm} for song: ${songInfo.name}`);
         }
+    }
+    
+    preloadBackgroundVideo() {
+        this.backgroundVideo = document.createElement('video');
+        this.backgroundVideo.muted = true; // 音声はゲーム音楽を使用
+        this.backgroundVideo.loop = true;
+        this.backgroundVideo.preload = 'auto';
+        this.backgroundVideo.style.display = 'none';
+        
+        // 動画ファイルのソースを設定
+        const videoSources = [
+            'douga00.mp4',
+            './douga00.mp4',
+            '/douga00.mp4'
+        ];
+        
+        let loadSuccess = false;
+        
+        const tryLoadVideo = (sourceIndex) => {
+            if (sourceIndex >= videoSources.length) {
+                console.log('Background video not found, using default background');
+                return;
+            }
+            
+            this.backgroundVideo.src = videoSources[sourceIndex];
+            
+            this.backgroundVideo.oncanplaythrough = () => {
+                if (!loadSuccess) {
+                    loadSuccess = true;
+                    this.videoLoaded = true;
+                    console.log(`Background video loaded: ${videoSources[sourceIndex]}`);
+                    document.body.appendChild(this.backgroundVideo);
+                }
+            };
+            
+            this.backgroundVideo.onerror = () => {
+                console.log(`Failed to load ${videoSources[sourceIndex]}, trying next...`);
+                tryLoadVideo(sourceIndex + 1);
+            };
+        };
+        
+        tryLoadVideo(0);
     }
 
     preloadAudio() {
@@ -253,8 +300,18 @@ class MusicGame {
         this.generateRandomPattern();
         
         this.playBackgroundMusic();
+        this.playBackgroundVideo();
         
         console.log(`Game started with ${this.notes.length} notes`);
+    }
+    
+    playBackgroundVideo() {
+        if (this.backgroundVideo && this.videoLoaded) {
+            this.backgroundVideo.currentTime = 0;
+            this.backgroundVideo.play().catch(e => {
+                console.log('Video playback failed:', e);
+            });
+        }
     }
     
     initAudioAnalysis() {
@@ -507,6 +564,53 @@ class MusicGame {
             }
         }
     }
+    
+    // ゲーム終了時の処理
+    endGame() {
+        this.isPlaying = false;
+        
+        // 音楽停止
+        if (this.audio) {
+            this.audio.pause();
+        }
+        
+        // 動画停止
+        if (this.backgroundVideo) {
+            this.backgroundVideo.pause();
+        }
+        
+        console.log('Game ended');
+    }
+    
+    // ゲーム一時停止
+    pauseGame() {
+        if (this.isPlaying) {
+            this.isPlaying = false;
+            
+            if (this.audio) {
+                this.audio.pause();
+            }
+            
+            if (this.backgroundVideo) {
+                this.backgroundVideo.pause();
+            }
+        }
+    }
+    
+    // ゲーム再開
+    resumeGame() {
+        if (!this.isPlaying) {
+            this.isPlaying = true;
+            
+            if (this.audio) {
+                this.audio.play();
+            }
+            
+            if (this.backgroundVideo) {
+                this.backgroundVideo.play();
+            }
+        }
+    }
 
     draw() {
         this.ctx.fillStyle = '#000033';
@@ -519,7 +623,55 @@ class MusicGame {
         this.drawParticles();
     }
 
-    drawBackground() {
+    drawBackground(highVolume = false) {
+        // 動画背景がある場合は動画を描画
+        if (this.backgroundVideo && this.videoLoaded && this.isPlaying) {
+            this.drawVideoBackground(highVolume);
+        } else {
+            this.drawDefaultBackground(highVolume);
+        }
+    }
+    
+    drawVideoBackground(highVolume = false) {
+        // 動画をCanvasに描画
+        this.ctx.save();
+        
+        // 動画のアスペクト比を保持してCanvasに合わせる
+        const videoAspect = this.backgroundVideo.videoWidth / this.backgroundVideo.videoHeight;
+        const canvasAspect = this.canvas.width / this.canvas.height;
+        
+        let drawWidth, drawHeight, offsetX, offsetY;
+        
+        if (videoAspect > canvasAspect) {
+            drawHeight = this.canvas.height;
+            drawWidth = drawHeight * videoAspect;
+            offsetX = (this.canvas.width - drawWidth) / 2;
+            offsetY = 0;
+        } else {
+            drawWidth = this.canvas.width;
+            drawHeight = drawWidth / videoAspect;
+            offsetX = 0;
+            offsetY = (this.canvas.height - drawHeight) / 2;
+        }
+        
+        // 動画の透明度を調整（ゲームプレイしやすくするため）
+        this.ctx.globalAlpha = highVolume ? 0.6 : 0.4;
+        
+        // 動画を描画
+        this.ctx.drawImage(this.backgroundVideo, offsetX, offsetY, drawWidth, drawHeight);
+        
+        // オーバーレイ（ゲーム要素を見やすくするため）
+        this.ctx.globalAlpha = 0.3;
+        this.ctx.fillStyle = '#000033';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.ctx.restore();
+        
+        // 追加のエフェクト
+        this.addVideoEffects(highVolume);
+    }
+    
+    drawDefaultBackground(highVolume = false) {
         const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
         gradient.addColorStop(0, '#1a1a2e');
         gradient.addColorStop(0.5, '#16213e');
@@ -527,11 +679,36 @@ class MusicGame {
         this.ctx.fillStyle = gradient;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        // 星のエフェクト
+        const starOpacity = highVolume ? 0.15 : 0.05;
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${starOpacity})`;
         for (let i = 0; i < 50; i++) {
             const x = Math.random() * this.canvas.width;
             const y = (Date.now() * 0.1 + i * 50) % (this.canvas.height + 50);
             this.ctx.fillRect(x, y, 2, 20);
+        }
+    }
+    
+    addVideoEffects(highVolume = false) {
+        if (highVolume) {
+            // 高音量時の追加エフェクト
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.2;
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.restore();
+        }
+        
+        // 音楽のビートに合わせた効果
+        if (this.beatDetector) {
+            const frequencyBands = this.beatDetector.getFrequencyBands();
+            if (frequencyBands.low > 0.8) {
+                this.ctx.save();
+                this.ctx.globalAlpha = 0.1;
+                this.ctx.fillStyle = '#ff6b6b';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.restore();
+            }
         }
     }
 
