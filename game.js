@@ -225,6 +225,7 @@ class MusicGame {
             
             audio.oncanplaythrough = () => {
                 if (!this.audioLoaded) {
+                    console.log(`Audio loaded successfully: ${audioFile}`);
                     this.audio = audio;
                     this.audioLoaded = true;
                     this.audio.volume = 0.7;
@@ -233,6 +234,13 @@ class MusicGame {
                     // 選択した楽曲をキャッシュ
                     const selectedSongId = this.songManager.getSelectedSong();
                     this.songManager.cacheAudioFile(selectedSongId, audio);
+                    
+                    console.log('Audio details:', {
+                        src: audio.src,
+                        duration: audio.duration,
+                        volume: audio.volume,
+                        loop: audio.loop
+                    });
                     
                     updateProgress(100);
                     this.showLoadingComplete(true);
@@ -330,9 +338,71 @@ class MusicGame {
 
     playBackgroundMusic() {
         if (this.audio && this.audioLoaded) {
+            console.log('Attempting to play audio...');
             this.audio.currentTime = 0;
-            this.audio.play().catch(e => {
-                console.log('Audio playback failed:', e);
+            this.audio.volume = 0.7;
+            
+            const playPromise = this.audio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log('Audio playback started successfully');
+                }).catch(e => {
+                    console.error('Audio playback failed:', e);
+                    
+                    // ユーザー操作が必要な場合の処理
+                    if (e.name === 'NotAllowedError') {
+                        console.log('Audio blocked by browser autoplay policy');
+                        this.showAudioUnblockMessage();
+                    }
+                });
+            }
+        } else {
+            console.warn('Audio not loaded or not available');
+            console.log('Audio state:', {
+                hasAudio: !!this.audio,
+                audioLoaded: this.audioLoaded,
+                audioSrc: this.audio ? this.audio.src : 'N/A'
+            });
+        }
+    }
+    
+    showAudioUnblockMessage() {
+        // 音楽がブロックされた場合のメッセージ表示
+        const message = document.createElement('div');
+        message.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1000;
+            text-align: center;
+            font-family: Arial, sans-serif;
+        `;
+        message.innerHTML = `
+            <h3>音楽を有効にしてください</h3>
+            <p>ブラウザの自動再生ポリシーにより音楽がブロックされました。</p>
+            <button onclick="this.parentElement.remove(); game.enableAudio();" style="
+                background: #ff6b6b;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+            ">音楽を有効にする</button>
+        `;
+        document.body.appendChild(message);
+    }
+    
+    enableAudio() {
+        if (this.audio) {
+            this.audio.play().then(() => {
+                console.log('Audio enabled by user interaction');
+            }).catch(e => {
+                console.error('Still unable to play audio:', e);
             });
         }
     }
@@ -507,36 +577,25 @@ class MusicGame {
         const currentTime = Date.now() - this.gameStartTime;
         const deltaTime = 16;
         
-        // ノーツの位置を時間ベースで計算
-        const lookAheadTime = 3000; // 3秒先まで表示
-        
+        // シンプルなノーツ移動システムに戻す
         for (let note of this.notes) {
-            if (!note.hit && !note.visible) {
-                // ノーツを表示する時間になったかチェック
-                if (currentTime >= note.time - lookAheadTime) {
-                    note.visible = true;
+            if (!note.hit) {
+                // 時間ベースでノーツを出現させる
+                if (currentTime >= note.time - 3000 && !note.active) { // 3秒前に出現
+                    note.active = true;
                     note.y = -50; // 画面上部から開始
                 }
-            }
-            
-            if (note.visible && !note.hit) {
-                // ノーツがヒットゾーンに到達する時間を計算
-                const timeToHit = note.time - currentTime;
-                const distanceToHit = this.hitZoneY + 50; // 画面上部からヒットゾーンまでの距離
                 
-                // 時間に基づいてY座標を計算
-                if (timeToHit > 0) {
-                    note.y = distanceToHit - (distanceToHit * (lookAheadTime - timeToHit) / lookAheadTime);
-                } else {
-                    // 時間を過ぎた場合は通常の移動
+                // アクティブなノーツを下に移動
+                if (note.active) {
                     note.y += this.noteSpeed * deltaTime / 1000;
-                }
-                
-                // ミス判定
-                if (note.y > this.hitZoneY + this.hitTolerance && !note.hit) {
-                    note.hit = true;
-                    this.combo = 0;
-                    this.showHitEffect(this.lanes[note.lane], 'miss');
+                    
+                    // ミス判定
+                    if (note.y > this.hitZoneY + this.hitTolerance) {
+                        note.hit = true;
+                        this.combo = 0;
+                        this.showHitEffect(this.lanes[note.lane], 'miss');
+                    }
                 }
             }
         }
@@ -737,9 +796,12 @@ class MusicGame {
     }
 
     drawNotes() {
+        let visibleCount = 0;
+        
         for (let note of this.notes) {
-            if (note.hit || !note.visible) continue;
+            if (note.hit || !note.active) continue;
             
+            visibleCount++;
             const x = this.lanes[note.lane];
             
             // ノーツの種類に応じて色を変更
@@ -766,19 +828,18 @@ class MusicGame {
             this.ctx.strokeStyle = '#ffffff';
             this.ctx.lineWidth = 2;
             this.ctx.stroke();
+        }
+        
+        // デバッグ情報
+        if (this.isPlaying) {
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.font = '16px Arial';
+            this.ctx.textAlign = 'left';
+            this.ctx.fillText(`Visible Notes: ${visibleCount}`, 10, 100);
+            this.ctx.fillText(`Total Notes: ${this.notes.length}`, 10, 120);
             
-            // デバッグ用：ノーツのタイミング表示
-            if (this.isPlaying) {
-                const currentTime = Date.now() - this.gameStartTime;
-                const timeDiff = note.time - currentTime;
-                
-                if (Math.abs(timeDiff) < 200) { // ±200ms以内
-                    this.ctx.fillStyle = '#ffffff';
-                    this.ctx.font = '12px Arial';
-                    this.ctx.textAlign = 'center';
-                    this.ctx.fillText(Math.round(timeDiff), x, note.y - 35);
-                }
-            }
+            const currentTime = Date.now() - this.gameStartTime;
+            this.ctx.fillText(`Time: ${Math.floor(currentTime / 1000)}s`, 10, 140);
         }
     }
 
@@ -802,5 +863,6 @@ class MusicGame {
 }
 
 window.addEventListener('load', () => {
-    new MusicGame();
+    window.game = new MusicGame();
+    console.log('Game initialized globally');
 });
