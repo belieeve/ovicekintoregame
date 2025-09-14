@@ -101,7 +101,17 @@ class MusicGame {
         
         const tryLoadAudio = (fileIndex) => {
             if (fileIndex >= audioFiles.length) {
-                this.showLoadingComplete(false);
+                // すべての外部音楽ファイルに失敗した場合、サンプル音楽を使用
+                console.log('All external audio files failed, using sample music');
+                try {
+                    this.audio = getSampleMusic();
+                    this.audioLoaded = true;
+                    updateProgress(100);
+                    this.showLoadingComplete(true, 'サンプル音楽');
+                } catch (error) {
+                    console.error('Sample music failed:', error);
+                    this.showLoadingComplete(false);
+                }
                 return;
             }
             
@@ -133,7 +143,7 @@ class MusicGame {
         tryLoadAudio(0);
     }
 
-    showLoadingComplete(audioFound) {
+    showLoadingComplete(audioFound, audioType = null) {
         setTimeout(() => {
             this.loadingScreen.style.display = 'none';
             this.startScreen.style.display = 'flex';
@@ -148,10 +158,16 @@ class MusicGame {
                     <small style="color: #aaaaaa;">コンソールで showMusicLoader() を実行して音楽を追加できます</small>
                 `;
             } else {
-                const trackInfo = this.musicDataManager.getTrackInfo();
-                if (trackInfo && trackInfo.name) {
-                    const instructions = this.startScreen.querySelector('.instructions');
-                    instructions.innerHTML += `<br><small style="color: #4CAF50;">♪ ${trackInfo.name} が読み込まれました</small>`;
+                const instructions = this.startScreen.querySelector('.instructions');
+                if (audioType === 'サンプル音楽') {
+                    instructions.innerHTML += `<br><small style="color: #FFA500;">♪ ${audioType}で開始します（GitHub音楽ファイル読み込み失敗）</small>`;
+                } else {
+                    const trackInfo = this.musicDataManager.getTrackInfo();
+                    if (trackInfo && trackInfo.name) {
+                        instructions.innerHTML += `<br><small style="color: #4CAF50;">♪ ${trackInfo.name} が読み込まれました</small>`;
+                    } else {
+                        instructions.innerHTML += `<br><small style="color: #4CAF50;">♪ 音楽ファイルが読み込まれました</small>`;
+                    }
                 }
             }
         }, 500);
