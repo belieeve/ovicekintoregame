@@ -125,9 +125,9 @@ class MusicGame {
         
         // 動画ファイルのソースを設定
         const videoSources = [
-            'douga00.mp4',
-            './douga00.mp4',
-            '/douga00.mp4'
+            'douga03.mp4',
+            './douga03.mp4',
+            '/douga03.mp4'
         ];
         
         let loadSuccess = false;
@@ -695,28 +695,16 @@ class MusicGame {
         // 動画をCanvasに描画
         this.ctx.save();
         
-        // 動画のアスペクト比を保持してCanvasに合わせる
-        const videoAspect = this.backgroundVideo.videoWidth / this.backgroundVideo.videoHeight;
-        const canvasAspect = this.canvas.width / this.canvas.height;
-        
-        let drawWidth, drawHeight, offsetX, offsetY;
-        
-        if (videoAspect > canvasAspect) {
-            drawHeight = this.canvas.height;
-            drawWidth = drawHeight * videoAspect;
-            offsetX = (this.canvas.width - drawWidth) / 2;
-            offsetY = 0;
-        } else {
-            drawWidth = this.canvas.width;
-            drawHeight = drawWidth / videoAspect;
-            offsetX = 0;
-            offsetY = (this.canvas.height - drawHeight) / 2;
-        }
+        // 動画を画面いっぱいに表示（アスペクト比を無視してストレッチ）
+        const drawWidth = this.canvas.width;
+        const drawHeight = this.canvas.height;
+        const offsetX = 0;
+        const offsetY = 0;
         
         // 動画の透明度を調整（ゲームプレイしやすくするため）
         this.ctx.globalAlpha = highVolume ? 0.6 : 0.4;
         
-        // 動画を描画
+        // 動画を画面全体に描画
         this.ctx.drawImage(this.backgroundVideo, offsetX, offsetY, drawWidth, drawHeight);
         
         // オーバーレイ（ゲーム要素を見やすくするため）
